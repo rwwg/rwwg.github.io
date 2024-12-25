@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>금융 게임</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            margin: 20px;
+        }
+        .asset {
+            margin: 10px 0;
+        }
+        .btn {
+            padding: 12px 24px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .result-item {
+            margin-bottom: 10px;
+        }
+        .goal-status {
+            margin-top: 10px;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>금융 게임</h1>
+
+        <div class="game-info">
+            <p>목표 금액: <span id="goal-amount">200만</span> </p>
+            <p>현재 보유 금액: <span id="current-funds">100만</span> </p>
+            <p>현재 턴: <span id="current-turn">1</span></p>
+        </div>
+
+        <div class="assets">
+            <h2>자산 선택</h2>
+            <div class="asset">
+                <label>
+                    예금 (1%~3%, 1턴 후 현금화)
+                </label>
+                <button class="btn" data-action="invest" data-asset="deposit">투자</button>
+            </div>
+            <div class="asset">
+                <label>
+                    적금 (2%~4%, 3턴 후 현금화)
+                </label>
+                <button class="btn" data-action="invest" data-asset="savings">투자</button>
+            </div>
+            <div class="asset">
+                <label>
+                    주식 (10%~-10%, 5% 확률로 -50% 손실, 즉시 현금화)
+                </label>
+                <button class="btn" data-action="invest" data-asset="stocks">투자</button>
+            </div>
+            <div class="asset">
+                <label>
+                    채권 (3%~6% 수익, 10% 확률로 100% 손실, 2턴 후 현금화, )
+                </label>
+                <button class="btn" data-action="invest" data-asset="bonds">투자</button>
+            </div>
+            <div class="asset">
+                <label>
+                    부동산 (4%~8% 수익, 20% 확률로 0%~10% 손실 , 6턴 후 현금화)
+                </label>
+                <button class="btn" data-action="invest" data-asset="real_estate">투자</button>
+            </div>
+        </div>
+
+        <div class="results">
+            <h2>투자 결과</h2>
+            <ul id="results"></ul>
+        </div>
+
+        <button class="btn" id="reset-btn">게임 초기화</button>
+    </div>
+
+    <script>
+        const assets = {
+            deposit: { name: '예금', minReturn: 0.01, maxReturn: 0.03, timeToCash: 1 },
+            savings: { name: '적금', minReturn: 0.02, maxReturn: 0.04, timeToCash: 3 },
+            stocks: { name: '주식', minReturn: -0.10, maxReturn: 0.10, timeToCash: 0, disasterChance: 0.05, disasterReturn: -0.50 },
+            bonds: { name: '채권', minReturn: 0.03, maxReturn: 0.06, timeToCash: 2, disasterChance: 0.10, disasterReturn: -1 },
+            real_estate: { 
+                name: '부동산', 
+                minReturn: 0.04, 
+                maxReturn: 0.08, 
+                timeToCash: 6, 
+                disasterChance: 0.20, 
+                disasterMinReturn: -0.10, 
+                disasterMaxReturn: 0.00 
+            }
+        };
+
+        let currentFunds = 1000000;  // 시작 자본
+        let currentTurn = 1;  // 시작 턴
+        const totalTurns = 20;  // 턴 제한
+        const goalAmount = 2000000;  // 목표 금액
+
+        document.getElementById('goal-amount').textContent = formatCurrency(goalAmount); // 목표 금액 표시 업데이트
+        document.getElementById('current-funds').textContent = formatCurrency(currentFunds);
+        document.getElementById('current-turn').textContent = currentTurn;
+
+        document.querySelectorAll('.btn[data-action="invest"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                if (currentFunds < 1 || currentTurn > totalTurns) {
+                    alert('게임이 종료되었습니다. 더 이상 투자가 불가능합니다.');
+                    return;
+                }
+
+                const asset = e.target.dataset.asset;
+                const investmentAmount = parseFloat(prompt(`투자할 ${assets[asset].name} 금액을 입력하세요:`)) || 0;
+
+                if (assets[asset] && investmentAmount > 0 && investmentAmount <= currentFunds) {
+                    let returnRate = getRandomReturnRate(asset);
+
+                    // 특별 조건 처리
+                    if (asset === 'stocks' && Math.random() < assets[asset].disasterChance) {
+                        returnRate = assets[asset].disasterReturn;  // -50% 수익률
+                    }
+                    if (asset === 'bonds' && Math.random() < assets[asset].disasterChance) {
+                        returnRate = assets[asset].disasterReturn;  // -100% 수익률
+                    }
+                    if (asset === 'real_estate' && Math.random() < assets[asset].disasterChance) {
+                        returnRate = Math.random() * (assets[asset].disasterMaxReturn - assets[asset].disasterMinReturn) + assets[asset].disasterMinReturn;
+                    }
+
+                    let profit = investmentAmount * returnRate;
+                    currentFunds += Math.round(profit);
+                    currentTurn += assets[asset].timeToCash;
+
+                    document.getElementById('current-funds').textContent = formatCurrency(currentFunds);
+                    document.getElementById('current-turn').textContent = currentTurn;
+
+                    document.getElementById('results').innerHTML += `<li>${assets[asset].name}에 투자: 투자금 ${formatCurrency(investmentAmount)}, 수익금 ${formatCurrency(profit)} (${(returnRate * 100).toFixed(2)}%)</li>`;
+
+                    if (currentFunds >= goalAmount || currentTurn > totalTurns) {
+                        endGame();
+                    }
+                } else {
+                    alert('올바른 투자 금액을 입력해주세요.');
+                }
+            });
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            currentFunds = 1000000;
+            currentTurn = 1;
+            document.getElementById('current-funds').textContent = formatCurrency(currentFunds);
+            document.getElementById('current-turn').textContent = currentTurn;
+            document.getElementById('results').innerHTML = '';
+        });
+
+        function getRandomReturnRate(asset) {
+            const { minReturn, maxReturn } = assets[asset];
+            return Math.random() * (maxReturn - minReturn) + minReturn;
+        }
+
+        function endGame() {
+            let message = '게임이 종료되었습니다. ';
+            if (currentFunds >= goalAmount) {
+                message += `축하합니다! 목표 금액 ${formatCurrency(goalAmount)}을(를) 달성했습니다!`;
+            } else {
+                message += '자본이 0원이 되었거나 턴 제한에 도달했습니다.';
+            }
+            alert(message);
+            document.getElementById('results').innerHTML += `<li>${message}</li>`;
+        }
+
+        function formatCurrency(amount) {
+            return amount.toLocaleString('ko-KR') + ' 원';
+        }
+    </script>
+
+</body>
+</html>
